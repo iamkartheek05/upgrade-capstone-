@@ -2,70 +2,63 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_KEY_ID = 'projectkey'
-        AWS_USER = 'ubuntu'
+        KEY_FILE = credentials('projectkey')         
+        DEPLOY_USER = 'ubuntu'
         AWS_HOST = '54.237.188.236'
-        AZURE_USER = 'kartheek'
-        AZURE_HOST = '52.170.136.209'
+        AZURE_HOST = 'http://52.170.136.209/'                   
         TARGET_PATH = '/var/www/html/index.html'
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Verify AWS Connection') {
             steps {
-                checkout scm
+                sh '''
+                echo "Verifying SSH access to AWS..."
+                ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $DEPLOY_USER@$AWS_HOST echo 'AWS Connected'
+                '''
             }
         }
 
         stage('Deploy to AWS') {
             steps {
-                withCredentials([file(credentialsId: DEPLOY_KEY_ID, variable: 'KEY_FILE')]) {
-                    sh '''
-                    echo "Verifying SSH access to AWS..."
-                    ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $AWS_USER@$AWS_HOST "echo 'AWS Connected'"
+                sh '''
+                echo "Copying index.html to AWS..."
+                scp -i "$KEY_FILE" index.html $DEPLOY_USER@$AWS_HOST:/tmp/index.html
 
-                    echo "Copying index.html to AWS..."
-                    scp -i "$KEY_FILE" index.html $AWS_USER@$AWS_HOST:/tmp/index.html
+                echo "Deploying to AWS web root..."
+                ssh -i "$KEY_FILE" $DEPLOY_USER@$AWS_HOST "sudo mv /tmp/index.html $TARGET_PATH && sudo chown www-data:www-data $TARGET_PATH && sudo systemctl restart nginx"
+                '''
+            }
+        }
 
-                    echo "Moving file to web root and restarting Nginx on AWS..."
-                    ssh -i "$KEY_FILE" $AWS_USER@$AWS_HOST << EOF
-                      sudo mv /tmp/index.html $TARGET_PATH
-                      sudo chown www-data:www-data $TARGET_PATH
-                      sudo systemctl restart nginx
-                    EOF
-                    '''
-                }
+        stage('Verify Azure Connection') {
+            steps {
+                sh '''
+                echo "Verifying SSH access to Azure..."
+                ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $DEPLOY_USER@$AZURE_HOST echo 'Azure Connected'
+                '''
             }
         }
 
         stage('Deploy to Azure') {
             steps {
-                withCredentials([file(credentialsId: DEPLOY_KEY_ID, variable: 'KEY_FILE')]) {
-                    sh '''
-                    echo "Verifying SSH access to Azure..."
-                    ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $AZURE_USER@$AZURE_HOST "echo 'Azure Connected'"
+                sh '''
+                echo "Copying index.html to Azure..."
+                scp -i "$KEY_FILE" index.html 'kartheek'@$AZURE_HOST:/tmp/index.html
 
-                    echo "Copying index.html to Azure..."
-                    scp -i "$KEY_FILE" index.html $AZURE_USER@$AZURE_HOST:/tmp/index.html
-
-                    echo "Moving file to web root and restarting Nginx on Azure..."
-                    ssh -i "$KEY_FILE" $AZURE_USER@$AZURE_HOST << EOF
-                      sudo mv /tmp/index.html $TARGET_PATH
-                      sudo chown www-data:www-data $TARGET_PATH
-                      sudo systemctl restart nginx
-                    EOF
-                    '''
-                }
+                echo "Deploying to Azure web root..."
+                ssh -i "$KEY_FILE" 'kartheek'@$AZURE_HOST "sudo mv /tmp/index.html $TARGET_PATH && sudo chown www-data:www-data $TARGET_PATH && sudo systemctl restart nginx"
+                '''
             }
         }
     }
 
     post {
-        success {
-            echo 'Deployment to AWS and Azure completed successfully!'
-        }
         failure {
             echo 'Deployment failed. Check the logs for more details.'
+        }
+        success {
+            echo 'Multicloud Deployment succeeded on both AWS and Azure!'
         }
     }
 }
