@@ -1,0 +1,24 @@
+- name: Install and Configure Nginx
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Ensure Nginx is running and enabled
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Verify Nginx status
+      command: systemctl status nginx
+      register: nginx_status
+      changed_when: false
+
+    - name: Show Nginx status
+      debug:
+        var: nginx_status.stdout_lines
