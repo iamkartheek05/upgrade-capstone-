@@ -1,0 +1,76 @@
+pipeline {
+    agent any
+
+    environment {
+        DEPLOY_USER_AWS = 'ubuntu'
+        DEPLOY_HOST_AWS = '44.204.156.107'
+        DEPLOY_USER_Azure = 'kartheek'
+        DEPLOY_HOST_Azure = '172.190.71.26'
+        TARGET_PATH = '/var/www/html/index.html'
+    }
+
+    stages {
+        stage('Checkout SCM') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Deploy to AWS') {
+            steps {
+                withCredentials([file(credentialsId: 'projectkey', variable: 'KEY_FILE')]) {
+                    sh '''
+                    echo "Verifying SSH access..."
+                    ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $DEPLOY_USER_AWS@$DEPLOY_HOST_AWS "echo 'EC2 accessible'"
+
+                    echo "Copying index.html to EC2..."
+                    scp -i "$KEY_FILE" index.html $DEPLOY_USER_AWS@$DEPLOY_HOST_AWS:/tmp/index.html
+
+                    echo "Moving index.html to web server root..."
+                    ssh -i "$KEY_FILE" $DEPLOY_USER_AWS@$DEPLOY_HOST_AWS << EOF
+                      sudo mv /tmp/index.html $TARGET_PATH
+                      sudo chown www-data:www-data $TARGET_PATH
+                      sudo systemctl restart nginx
+                    EOF
+
+                    echo "Deployment complete"
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy to Azure') {
+            steps {
+                withCredentials([file(credentialsId: 'projectkey', variable: 'KEY_FILE')]) {
+                    sh '''
+                    echo "Verifying SSH access..."
+                    ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $DEPLOY_USER_Azure@$DEPLOY_HOST_Azure "echo 'Azure VM accessible'"
+
+                    echo "Copying index.html to Azure VM..."
+                    scp -i "$KEY_FILE" index.html $DEPLOY_USER_Azure@$DEPLOY_HOST_Azure:/tmp/index.html
+
+                    echo "Moving index.html to web server root..."
+                    ssh -i "$KEY_FILE" $DEPLOY_USER_Azure@$DEPLOY_HOST_Azure << EOF
+                      sudo mv /tmp/index.html $TARGET_PATH
+                      sudo chown www-data:www-data $TARGET_PATH
+                      sudo systemctl restart nginx
+                    EOF
+
+                    echo "Deployment complete"
+                    '''
+                }
+            }
+        }
+
+        
+    }
+
+    post {
+        success {
+            echo 'Deployment succeeded!'
+        }
+        failure {
+            echo 'Deployment failed. Review pipeline logs.'
+        }
+    }
+}
