@@ -1,0 +1,29 @@
+- name: Install and Configure Nginx with Custom Pages
+  hosts: all
+  become: true
+  tasks:
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: true
+
+    - name: Copy AWS index page
+      copy:
+        src: index-aws.html
+        dest: /var/www/html/index.html
+        mode: '0644'
+      when: "'aws' in group_names"
+
+    - name: Copy Azure index page
+      copy:
+        src: index-azure.html
+        dest: /var/www/html/index.html
+        mode: '0644'
+      when: "'azure' in group_names"
+
+    - name: Restart Nginx
+      service:
+        name: nginx
+        state: restarted
+        enabled: true
