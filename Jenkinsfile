@@ -1,27 +1,18 @@
 pipeline {
   agent any
 
-  stages {
-    stage('Pull HTML Files') {
-      steps {
-        git url: 'https://github.com/iamkartheek05/upgrade-capstone-.git', branch: 'main'
-      }
-    }
+  environment {
+    KEY_ID = credentials('projectkey')
+  }
 
+  stages {
     stage('Deploy to AWS') {
       steps {
         sh '''
-        scp -i ~/.ssh/project_key.pem index-aws.html ubuntu@44.204.156.107:/tmp/index.html
-        ssh -i ~/.ssh/project_key.pem ubuntu@44.204.156.107 "sudo mv /tmp/index.html /var/www/html/index.html && sudo systemctl restart nginx"
-        '''
-      }
-    }
+        chmod 400 "$KEY_ID"
 
-    stage('Deploy to Azure') {
-      steps {
-        sh '''
-        scp -i ~/.ssh/project_key.pem index-azure.html kartheek@172.190.71.26:/tmp/index.html
-        ssh -i ~/.ssh/project_key.pem kartheek@172.190.71.26 "sudo mv /tmp/index.html /var/www/html/index.html && sudo systemctl restart nginx"
+        scp -i "$KEY_ID" index-aws.html ubuntu@44.204.156.107:/tmp/index.html
+        ssh -i "$KEY_ID" ubuntu@44.204.156.107 'sudo mv /tmp/index.html /var/www/html/index.html && sudo systemctl restart nginx'
         '''
       }
     }
