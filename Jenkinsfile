@@ -4,9 +4,9 @@ pipeline {
     environment {
         DEPLOY_KEY_ID = 'projectkey'
         AWS_USER = 'ubuntu'
-        AWS_HOST = '44.204.156.107'
+        AWS_HOST = '54.237.188.236'
         AZURE_USER = 'kartheek'
-        AZURE_HOST = '172.190.71.26'
+        AZURE_HOST = '52.170.136.209'
         TARGET_PATH = '/var/www/html/index.html'
     }
 
