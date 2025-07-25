@@ -2,8 +2,11 @@ pipeline {
     agent any
 
     environment {
-        DEPLOY_USER = 'ubuntu'
-        DEPLOY_HOST = '44.204.156.107'
+        DEPLOY_KEY_ID = 'projectkey'
+        AWS_USER = 'ubuntu'
+        AWS_HOST = '44.204.156.107'
+        AZURE_USER = 'kartheek'
+        AZURE_HOST = '172.190.71.26'
         TARGET_PATH = '/var/www/html/index.html'
     }
 
@@ -16,22 +19,41 @@ pipeline {
 
         stage('Deploy to AWS') {
             steps {
-                withCredentials([file(credentialsId: 'projectkey', variable: 'KEY_FILE')]) {
+                withCredentials([file(credentialsId: DEPLOY_KEY_ID, variable: 'KEY_FILE')]) {
                     sh '''
-                    echo "Verifying SSH access..."
-                    ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $DEPLOY_USER@$DEPLOY_HOST "echo 'EC2 accessible'"
+                    echo "Verifying SSH access to AWS..."
+                    ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $AWS_USER@$AWS_HOST "echo 'AWS Connected'"
 
-                    echo "Copying index.html to EC2..."
-                    scp -i "$KEY_FILE" index.html $DEPLOY_USER@$DEPLOY_HOST:/tmp/index.html
+                    echo "Copying index.html to AWS..."
+                    scp -i "$KEY_FILE" index.html $AWS_USER@$AWS_HOST:/tmp/index.html
 
-                    echo "Moving index.html to web server root..."
-                    ssh -i "$KEY_FILE" $DEPLOY_USER@$DEPLOY_HOST << EOF
+                    echo "Moving file to web root and restarting Nginx on AWS..."
+                    ssh -i "$KEY_FILE" $AWS_USER@$AWS_HOST << EOF
                       sudo mv /tmp/index.html $TARGET_PATH
                       sudo chown www-data:www-data $TARGET_PATH
                       sudo systemctl restart nginx
                     EOF
+                    '''
+                }
+            }
+        }
 
-                    echo "🌐 Deployment complete. Check site at http://$DEPLOY_HOST"
+        stage('Deploy to Azure') {
+            steps {
+                withCredentials([file(credentialsId: DEPLOY_KEY_ID, variable: 'KEY_FILE')]) {
+                    sh '''
+                    echo "Verifying SSH access to Azure..."
+                    ssh -o StrictHostKeyChecking=accept-new -i "$KEY_FILE" $AZURE_USER@$AZURE_HOST "echo 'Azure Connected'"
+
+                    echo "Copying index.html to Azure..."
+                    scp -i "$KEY_FILE" index.html $AZURE_USER@$AZURE_HOST:/tmp/index.html
+
+                    echo "Moving file to web root and restarting Nginx on Azure..."
+                    ssh -i "$KEY_FILE" $AZURE_USER@$AZURE_HOST << EOF
+                      sudo mv /tmp/index.html $TARGET_PATH
+                      sudo chown www-data:www-data $TARGET_PATH
+                      sudo systemctl restart nginx
+                    EOF
                     '''
                 }
             }
@@ -40,10 +62,10 @@ pipeline {
 
     post {
         success {
-            echo 'Deployment succeeded!'
+            echo 'Deployment to AWS and Azure completed successfully!'
         }
         failure {
-            echo 'Deployment failed. Review pipeline logs.'
+            echo 'Deployment failed. Check the logs for more details.'
         }
     }
 }
