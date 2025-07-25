@@ -4,7 +4,7 @@ pipeline {
   stages {
     stage('Pull HTML Files') {
       steps {
-        git url: 'https://github.com/<your-username>/<repo-name>.git', branch: 'main'
+        git url: 'https://github.com/iamkartheek05/upgrade-capstone-.git', branch: 'main'
       }
     }
 
